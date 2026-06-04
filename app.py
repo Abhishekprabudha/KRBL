@@ -1,3 +1,4 @@
+import os
 import time
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -126,7 +127,8 @@ KRBL_CATALOG = {
 # -----------------------------
 with st.sidebar:
     st.header("KRBL demo controls")
-    autoplay = st.toggle("Autoplay telemetry", value=True)
+    default_autoplay = os.environ.get("KRBL_RENDER_DEMO") != "1"
+    autoplay = st.toggle("Autoplay telemetry", value=default_autoplay)
     tick_ms = st.slider("Refresh speed (ms)", 150, 1500, 420, 10)
 
     st.divider()

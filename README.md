@@ -25,6 +25,36 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
+
+## Render the MP3 narration and MP4 video demo
+
+The repo includes a two-step renderer for a shareable Streamlit walkthrough:
+
+1. Render the narration MP3 first.
+2. Capture the Streamlit end-to-end flow and mux it with the narration into an MP4.
+
+Install the Python dependencies, install a Chromium browser for Playwright, and make sure `ffmpeg` is available on your PATH:
+
+```bash
+pip install -r requirements.txt
+python -m playwright install chromium
+```
+
+Then run the one-command renderer:
+
+```bash
+python scripts/render_demo.py
+```
+
+Or run each stage explicitly:
+
+```bash
+python scripts/render_narration.py --output rendered_demo/krbl_narration.mp3
+python scripts/render_video_demo.py --narration rendered_demo/krbl_narration.mp3 --output rendered_demo/krbl_streamlit_demo.mp4
+```
+
+Outputs are written to `rendered_demo/` by default. The video renderer starts Streamlit locally, disables autoplay, walks through the scope, live timeline, agent recommendation, and KRBL GenBI tabs, captures the screens, and combines them with the narration.
+
 ## Deploy on Streamlit Cloud
 
 1. Upload this folder to a GitHub repository.
