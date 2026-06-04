@@ -9,6 +9,7 @@ with ffmpeg when ffmpeg is installed.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import shutil
 import subprocess
 import sys
@@ -22,10 +23,10 @@ from demo_media.storyboard import DEFAULT_NARRATION, NARRATION_TEXT  # noqa: E40
 
 
 def render_with_gtts(text: str, output: Path, language: str) -> bool:
-    try:
-        from gtts import gTTS
-    except ImportError:
+    if importlib.util.find_spec("gtts") is None:
         return False
+
+    from gtts import gTTS
 
     tts = gTTS(text=text, lang=language, slow=False)
     tts.save(str(output))
@@ -33,10 +34,10 @@ def render_with_gtts(text: str, output: Path, language: str) -> bool:
 
 
 def render_with_pyttsx3(text: str, output: Path) -> bool:
-    try:
-        import pyttsx3
-    except ImportError:
+    if importlib.util.find_spec("pyttsx3") is None:
         return False
+
+    import pyttsx3
 
     ffmpeg = shutil.which("ffmpeg")
     if ffmpeg is None:

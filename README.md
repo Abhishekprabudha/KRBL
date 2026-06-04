@@ -53,7 +53,7 @@ python scripts/render_narration.py --output rendered_demo/krbl_narration.mp3
 python scripts/render_video_demo.py --narration rendered_demo/krbl_narration.mp3 --output rendered_demo/krbl_streamlit_demo.mp4
 ```
 
-Outputs are written to `rendered_demo/` by default. The video renderer starts Streamlit locally, disables autoplay, walks through the scope, live timeline, agent recommendation, and KRBL GenBI tabs, captures the screens, and combines them with the narration.
+Outputs are written to `rendered_demo/` by default. The video renderer starts Streamlit locally, disables autoplay, walks through the scope, changes the replenishment-flow choices, opens the live timeline, agent recommendation, and KRBL GenBI tabs, captures multiple GenBI questions, and combines the screens with the narration. The renderer probes the MP3 duration and stretches the storyboard durations so the complete narration plays through instead of being cut off abruptly.
 
 
 ## Render and download media with GitHub Actions

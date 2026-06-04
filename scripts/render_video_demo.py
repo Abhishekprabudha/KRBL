@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import os
 import shutil
 import subprocess
@@ -58,23 +59,62 @@ def start_streamlit(port: int) -> subprocess.Popen:
     )
 
 
+def probe_media_duration(ffprobe: str, media_path: Path) -> float:
+    result = subprocess.run(
+        [
+            ffprobe,
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            str(media_path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return float(result.stdout.strip())
+
+
+def storyboard_durations(narration_duration: float, tail_padding: float) -> dict[str, float]:
+    base_total = sum(step.duration for step in STORYBOARD_STEPS)
+    target_total = max(base_total, narration_duration + tail_padding)
+    scale = target_total / base_total if base_total else 1.0
+    return {step.name: step.duration * scale for step in STORYBOARD_STEPS}
+
+
+async def choose_selectbox_option(page, label: str, value: str) -> None:
+    control = page.get_by_label(label)
+    await control.click()
+    option = page.get_by_role("option", name=value)
+    if not await option.count():
+        option = page.get_by_text(value, exact=True)
+    await option.first.click()
+    await page.wait_for_timeout(1400)
+
+
 async def apply_step(page, step) -> None:
     if step.action == "advance_timeline":
         button = page.get_by_role("button", name="⏩ Advance 10 days")
         if await button.count():
             await button.first.click()
-            await page.wait_for_timeout(1200)
+            await page.wait_for_timeout(1400)
+    elif step.action == "select_flow" and step.flow:
+        await choose_selectbox_option(page, "Select replenishment flow", step.flow)
     elif step.action == "open_live_timeline":
         await page.get_by_role("tab", name="📈 Live timeline").click()
-        await page.wait_for_timeout(800)
+        await page.wait_for_timeout(900)
     elif step.action == "open_agent_recommendation":
         await page.get_by_role("tab", name="🔮 Agent recommendation").click()
-        await page.wait_for_timeout(800)
+        await page.wait_for_timeout(900)
     elif step.action == "ask_genbi":
         await page.get_by_role("tab", name="🧠 KRBL GenBI").click()
         box = page.get_by_label("Your question")
         await box.fill(step.query or "What is KRBL's current stock?")
-        await page.wait_for_timeout(1200)
+        await box.press("Enter")
+        await page.wait_for_timeout(1500)
 
 
 async def capture_storyboard(url: str, frame_dir: Path, width: int, height: int) -> list[Path]:
@@ -102,13 +142,12 @@ async def capture_storyboard(url: str, frame_dir: Path, width: int, height: int)
     return frames
 
 
-def build_concat_file(frames: list[Path], concat_file: Path) -> None:
-    step_by_name = {step.name: step for step in STORYBOARD_STEPS}
+def build_concat_file(frames: list[Path], concat_file: Path, durations: dict[str, float]) -> None:
     with concat_file.open("w", encoding="utf-8") as fh:
         for frame in frames:
-            step = step_by_name[frame.stem]
+            duration = durations[frame.stem]
             fh.write(f"file '{frame.as_posix()}'\n")
-            fh.write(f"duration {step.duration:.3f}\n")
+            fh.write(f"duration {duration:.3f}\n")
         if frames:
             fh.write(f"file '{frames[-1].as_posix()}'\n")
 
@@ -134,7 +173,8 @@ def mux_video(ffmpeg: str, concat_file: Path, narration: Path, output: Path) -> 
             "veryfast",
             "-c:a",
             "aac",
-            "-shortest",
+            "-movflags",
+            "+faststart",
             str(output),
         ],
         check=True,
@@ -148,6 +188,12 @@ def main() -> int:
     parser.add_argument("--port", type=int, default=8501, help="Local Streamlit port.")
     parser.add_argument("--width", type=int, default=1440, help="Browser capture width.")
     parser.add_argument("--height", type=int, default=1100, help="Browser capture height.")
+    parser.add_argument(
+        "--audio-tail-padding",
+        type=float,
+        default=1.25,
+        help="Seconds to keep the final storyboard frame after narration ends.",
+    )
     args = parser.parse_args()
 
     narration = args.narration.resolve()
@@ -161,7 +207,9 @@ def main() -> int:
 
     try:
         ffmpeg = require_executable("ffmpeg")
-        import playwright.async_api  # noqa: F401
+        ffprobe = require_executable("ffprobe")
+        if importlib.util.find_spec("playwright.async_api") is None:
+            raise RuntimeError("Python package not found: playwright")
     except Exception as exc:  # noqa: BLE001 - actionable CLI failure
         print(f"Cannot render video demo: {exc}", file=sys.stderr)
         print("Install ffmpeg and run `python -m playwright install chromium` after installing requirements.", file=sys.stderr)
@@ -173,9 +221,11 @@ def main() -> int:
         wait_for_streamlit(url)
         import asyncio
 
+        narration_duration = probe_media_duration(ffprobe, narration)
+        durations = storyboard_durations(narration_duration, args.audio_tail_padding)
         frames = asyncio.run(capture_storyboard(url, frame_dir, args.width, args.height))
         concat_file = frame_dir / "frames.txt"
-        build_concat_file(frames, concat_file)
+        build_concat_file(frames, concat_file, durations)
         mux_video(ffmpeg, concat_file, narration, output)
         print(f"Video demo rendered: {output}")
         return 0
