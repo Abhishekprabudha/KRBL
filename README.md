@@ -55,6 +55,28 @@ python scripts/render_video_demo.py --narration rendered_demo/krbl_narration.mp3
 
 Outputs are written to `rendered_demo/` by default. The video renderer starts Streamlit locally, disables autoplay, walks through the scope, live timeline, agent recommendation, and KRBL GenBI tabs, captures the screens, and combines them with the narration.
 
+
+## Render and download media with GitHub Actions
+
+A manual GitHub Actions workflow is included for generating the MP3 narration and MP4 demo in the cloud.
+
+1. Push this repository to GitHub.
+2. Open the repository's **Actions** tab.
+3. Select **Render demo media**.
+4. Click **Run workflow**. You can keep the default output directory and artifact name.
+5. When the run finishes, open the workflow run summary and download the **krbl-demo-media** artifact.
+
+The downloaded artifact contains:
+
+- `krbl_narration.mp3`
+- `krbl_streamlit_demo.mp4`
+
+The workflow installs Python dependencies, ffmpeg, and Playwright Chromium, then runs:
+
+```bash
+python scripts/render_demo.py --output-dir rendered_demo
+```
+
 ## Deploy on Streamlit Cloud
 
 1. Upload this folder to a GitHub repository.
